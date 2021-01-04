@@ -18,6 +18,7 @@
 #include <process.h>
 
 #include "package.h"
+#include "INIReader.h"
 
 #pragma comment(lib, "Ws2_32")
 
@@ -44,8 +45,8 @@ FILE *fp = fopen("server.log", "a+");
 class Server
 {
 private:
-    static const int MAX_CONNECTION = 20;
     SOCKET server_socket;
+    int MAX_CONNECTION = 20;
     const char *ip_address = "127.0.0.1";
     const char *port = "2776";
 
@@ -57,8 +58,14 @@ public:
 
 Server::Server()
 {
-    // we can read server's information from config.ini in the future...
-    // I don't think it's necessary, though...
+    // Read server's information from config.ini
+    INIReader reader("config.ini");
+    if (reader.ParseError() != 0)
+        throw "Load config.ini failed.\n";
+    server_name = reader.Get("server", "server_name", "UNKNOWN").c_str();
+    ip_address = reader.Get("server", "ip", "UNKNOWN").c_str();
+    port = reader.Get("server", "port", "UNKNOWN").c_str();
+    MAX_CONNECTION = reader.GetInteger("server", "concurrency", -1);
 }
 
 Server::~Server()
