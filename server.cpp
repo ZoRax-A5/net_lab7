@@ -202,9 +202,15 @@ DWORD WINAPI connection(LPVOID ipParameter)
         {
             std::string s, ip_addr, port, message;
             SOCKET target = INVALID_SOCKET;
-            sockaddr_in del_addr;
+            sockaddr_in del_addr, src_addr;
             // get request type of package
             unsigned char type = read_buffer[0];
+            // TEST FOR RECEIVE READ BUFFER
+            // {
+            //     for (int i = 0; i < strlen(read_buffer); i++) {
+            //         printf("%c",read_buffer[i]);
+            //     }
+            // }
             switch (type)
             {
             case EXIT:
@@ -240,20 +246,21 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 break;
             case GET_CLIENT_MESSAGE:
                 // [1 byte type] [ip#port$] (type(io)) [message]
+                // [message] -> @ip#port$content
                 write_buffer[0] = SEND_CLIENT_MESSAGE;
                 s = std::string(read_buffer + 1);
                 ip_addr = s.substr(0, s.find("#"));
                 port = s.substr(s.find("#") + 1, s.find("$") - s.find("#") - 1);
                 message = s.substr(s.find("$") + 1);
+
                 // find target socket from client list
                 for (auto iter = clients_queue.begin(); iter != clients_queue.end(); ++iter)
                 {
                     char *caddr = inet_ntoa(iter->client_addr.sin_addr);
                     if (!strcmp(caddr, ip_addr.c_str()) && iter->client_addr.sin_port == std::stoi(port))
-                    {
                         target = iter->client_socket;
-                        break;
-                    }
+                    if (iter->client_socket == socket)
+                        src_addr = iter->client_addr;
                 }
                 if (target == INVALID_SOCKET)
                 {
@@ -262,7 +269,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 }
                 else
                 {
-                    sprintf(write_buffer + strlen(write_buffer), "%s", message.c_str());
+                    sprintf(write_buffer + strlen(write_buffer), "@%s#%d$%s", inet_ntoa(src_addr.sin_addr), src_addr.sin_port, message.c_str());
                     send(target, write_buffer, strlen(write_buffer), 0);
                 }
                 break;
@@ -271,7 +278,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 printf("failed to parses the request type of the packet.\n");
                 break;
             }
-            fprintf(fp, "%d", write_buffer[0]);
+            fprintf(fp, "%d ", write_buffer[0]);
             for (int i = 1; i < strlen(write_buffer); i++)
             {
 
