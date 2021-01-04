@@ -26,7 +26,6 @@ sockaddr_in removeClient(SOCKET client_addr);
 
 struct ClientSocket
 {
-public:
     SOCKET client_socket;
     sockaddr_in client_addr;
 
@@ -40,6 +39,7 @@ public:
 
 std::vector<ClientSocket> clients_queue;
 const char *server_name = "myserver";
+FILE *fp = fopen("server.log", "a+");
 
 class Server
 {
@@ -272,6 +272,13 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 printf("failed to parses the request type of the packet.\n");
                 break;
             }
+            fprintf(fp, "%d", write_buffer[0]);
+            for (int i = 1; i < strlen(write_buffer); i++)
+            {
+
+                fputc(write_buffer[i], fp);
+            }
+            fputc('\n', fp);
         }
     }
     return 0;
