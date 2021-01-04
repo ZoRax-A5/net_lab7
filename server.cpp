@@ -38,6 +38,10 @@ struct ClientSocket
     }
 };
 
+/*
+* server's basic infor default as below
+* config server's ip, port, concurrency and name in config.ini
+*/
 FILE *fp = fopen("server.log", "a+");
 const char *server_name = "myserver";
 const char *server_addr = "127.0.0.1";
@@ -58,7 +62,6 @@ public:
 
 Server::Server()
 {
-    // Read server's information from config.ini
 }
 
 Server::~Server()
@@ -310,6 +313,7 @@ int main(int argc, char **argv)
 {
     try
     {
+        // Read server's information from config.ini
         INIReader reader("config.ini");
         if (reader.ParseError() != 0)
             throw "Load config.ini failed.\n";
