@@ -18,7 +18,7 @@ using namespace std;
 //whether client is open or closed
 
 int waiting_for_reply = 0;
-char* cleanbuffer(char *buffer);
+void cleanbuffer(char buffer[]);
 char* cutbuffer(char *buffer);
 DWORD WINAPI connection(LPVOID ipParameter);
 
@@ -63,7 +63,8 @@ int Client::start()
     scanf("%d",&(this->current_service));
     printf("Waiting for the server to reply...\n");
     waiting_for_reply = 1;
-    char* a = (char*)malloc(BUFFER_LENGTH*sizeof(char));
+    char a[BUFFER_LENGTH] = {0};
+    // char* a = (char*)malloc(BUFFER_LENGTH*sizeof(char));
     if(current_service == 0&&islink ==0){
         //link 
         WORD sockVersion = MAKEWORD(2,2);
@@ -101,51 +102,50 @@ int Client::start()
     }
     else if(current_service == 1&&islink==1){
         //get time 
-        a[0] = 1;
+        a[0] = GET_TIME;
         send(mysocket,a,1,0);//strlen((char*)"1") == 1
-        a = cleanbuffer(a);
+        cleanbuffer(a);
     }
     else if(current_service == 2&&islink==1){
         //get server name
-        a[0] = 2;
+        a[0] = GET_SERVER_NAME;
         send(mysocket,a,1,0);
-        a = cleanbuffer(a);
+        cleanbuffer(a);
     }
     else if(current_service == 3&&islink==1){
         //get client list
-        a[0] = 3;
+        a[0] = GET_CLIENT_LIST;
         send(mysocket,a,1,0);
-        a = cleanbuffer(a);
+        cleanbuffer(a);
     }
     else if(current_service == 4&&islink==1){
         //get client message
-        a = cleanbuffer(a);
-        a[0] = 4;
-        printf("init a :  %s\n",a);
-        char ip_[10] = {0};
-        char port_[10] = {0};
-        char message_[BUFFER_LENGTH] = {0};
-        printf("Input the destination ip address : \n");
-        scanf("%s",ip_);
-        printf("Input the destination port : \n");
-        scanf("%s",port_);
-        scanf("%s",message_);
-        
-        strcat(a+1,ip_);
-        strcat(a+1,"#");
-        strcat(a+1,port_);
-        strcat(a+1,"$");
-        strcat(a+1,message_);
-        a = cutbuffer(a);
-        printf("now the package : %s",a);
-        send(mysocket,a ,strlen(a),0);
-        a = cleanbuffer(a);
+        cleanbuffer(a);
+        // a[0] = '4';
+        a[0] = GET_CLIENT_MESSAGE;
+        char send_addr[10] = {0};
+        char send_port[10] = {0};
+        char send_message[BUFFER_LENGTH] = {0};
+        printf("Please input the ip : \n");
+        scanf("%s",send_addr);
+        printf("Please input the port : \n");
+        scanf("%s",send_port);
+        printf("Please input the message : \n");
+        scanf("%s",send_message);
+        strcat(a, send_addr);
+        strcat(a, "#");
+        strcat(a, send_port);
+        strcat(a, "$");
+        strcat(a, send_message);
+        strcat(a, "\n\0");
+        send(mysocket,a,strlen(a),0);
+        cleanbuffer(a);
     }//现在的问题，三的输出多了一个，四的输入第一个byte写不进去。
     else if(current_service == 5){
         printf("exit the client\n");
         a[0] = 0;
         if(islink==1)send(mysocket,a,1,0);
-        a = cleanbuffer(a);
+        cleanbuffer(a);
         islink = 0;
         return 0;
     }
@@ -181,7 +181,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
 {
     SOCKET socket = *((SOCKET *)ipParameter);
     char* read_buffer = (char*)malloc(BUFFER_LENGTH*sizeof(char));
-    read_buffer = cleanbuffer(read_buffer);
+    cleanbuffer(read_buffer);
     int iResult;
     iResult = recv(socket, read_buffer, BUFFER_LENGTH, 0);
     if (iResult <= 0){
@@ -189,7 +189,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
         closesocket(socket);
     }
     else printf("FROM SERVER : %s\n",read_buffer);
-    read_buffer = cleanbuffer(read_buffer);
+    cleanbuffer(read_buffer);
     waiting_for_reply = 0;
     while(true){
         iResult = recv(socket, read_buffer, BUFFER_LENGTH, 0);
@@ -218,12 +218,13 @@ DWORD WINAPI connection(LPVOID ipParameter)
                         printf(", client port : ");
                     }
                     else if(cut_read_buffer[i] == '$'){
-                        if(cut_read_buffer[i+1] != 0){
+                        if((cut_read_buffer[i+1] >= '0'&&cut_read_buffer[i+1] <='9')||(cut_read_buffer[i+1] == '.')){
                             printf("\nNo.%d, client address : ",n);
                             n++;
                         }
                         else{
                             printf("\n");
+                            break;
                         }
                     }
                     else{
@@ -232,10 +233,13 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 }
             }
             else if(type == 4){
-                int message_start = 1;
+                int message_start = -1;
                 char* cut_read_buffer = cutbuffer(read_buffer);
-                printf("FROM SERVER : ");
+                
                 for(int i = 0; i < strlen(cut_read_buffer); i++){
+                    if(cut_read_buffer[i] == '@'){
+                        printf("FROM SERVER : ");
+                    }
                     if(cut_read_buffer[i] == '#'){
                         printf(", PORT : ");
                     }
@@ -247,9 +251,9 @@ DWORD WINAPI connection(LPVOID ipParameter)
                         printf("%c",cut_read_buffer[i]);
                     }
                 }
-                printf("MESSAGE : %s\n",cut_read_buffer+message_start);
+                if(message_start != -1)printf("MESSAGE : %s\n",cut_read_buffer+message_start);
             }
-            read_buffer = cleanbuffer(read_buffer);
+            cleanbuffer(read_buffer);
         }
         waiting_for_reply = 0;
     }
@@ -257,11 +261,10 @@ DWORD WINAPI connection(LPVOID ipParameter)
     return 0;
 }
 
-char* cleanbuffer(char *buffer){
+void cleanbuffer(char buffer[]){
     for(int i = 0; i < BUFFER_LENGTH; i++){
         buffer[i] = 0;
     }
-    return buffer;
 }
 
 char* cutbuffer(char* buffer){

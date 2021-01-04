@@ -241,11 +241,10 @@ DWORD WINAPI connection(LPVOID ipParameter)
             case GET_CLIENT_MESSAGE:
                 // [1 byte type] [ip#port$] (type(io)) [message]
                 write_buffer[0] = SEND_CLIENT_MESSAGE;
-                s = std::string(write_buffer + 1);
+                s = std::string(read_buffer + 1);
                 ip_addr = s.substr(0, s.find("#"));
                 port = s.substr(s.find("#") + 1, s.find("$") - s.find("#") - 1);
                 message = s.substr(s.find("$") + 1);
-
                 // find target socket from client list
                 for (auto iter = clients_queue.begin(); iter != clients_queue.end(); ++iter)
                 {
