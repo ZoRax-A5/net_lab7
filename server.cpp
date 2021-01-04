@@ -40,6 +40,7 @@ struct ClientSocket
 
 std::vector<ClientSocket> clients_queue;
 const char *server_name = "myserver";
+const char *server_addr = "127.0.0.1";
 FILE *fp = fopen("server.log", "a+");
 
 class Server
@@ -47,7 +48,6 @@ class Server
 private:
     SOCKET server_socket;
     int MAX_CONNECTION = 20;
-    const char *ip_address = "127.0.0.1";
     const char *port = "2776";
 
 public:
@@ -63,9 +63,9 @@ Server::Server()
     if (reader.ParseError() != 0)
         throw "Load config.ini failed.\n";
     server_name = reader.Get("server", "server_name", "UNKNOWN").c_str();
-    ip_address = reader.Get("server", "ip", "UNKNOWN").c_str();
-    port = reader.Get("server", "port", "UNKNOWN").c_str();
-    MAX_CONNECTION = reader.GetInteger("server", "concurrency", -1);
+    server_addr = reader.Get("server", "ip", "UNKNOWN").c_str();
+    this->port = reader.Get("server", "port", "UNKNOWN").c_str();
+    this->MAX_CONNECTION = reader.GetInteger("server", "concurrency", -1);
 }
 
 Server::~Server()
@@ -77,6 +77,7 @@ Server::~Server()
 
 void Server::start()
 {
+    const char *temp = server_addr;
     WSADATA wsaData;
     server_socket = INVALID_SOCKET;
     struct addrinfo *result = NULL,
@@ -88,7 +89,6 @@ void Server::start()
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0)
         throw "WSAStartup failed.\n";
-
     /* 
     * initial server's socket
     * socket(domain, type, protocol)
@@ -103,7 +103,7 @@ void Server::start()
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(NULL, port, &hints, &result);
+    iResult = getaddrinfo(server_addr, this->port, &hints, &result);
     if (iResult != 0)
     {
         WSACleanup();
@@ -120,6 +120,7 @@ void Server::start()
     }
 
     // bind with given Inet4address
+
     iResult = bind(server_socket, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR)
     {
