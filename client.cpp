@@ -143,6 +143,7 @@ int Client::start()
         strcat(a, "\n\0");
         send(mysocket,a,strlen(a),0);
         cleanbuffer(a);
+        waiting_for_reply = 0;
     }//现在的问题，三的输出多了一个，四的输入第一个byte写不进去。
     else if(current_service == 5){
         printf("exit the client\n");
