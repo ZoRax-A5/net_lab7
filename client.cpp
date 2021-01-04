@@ -131,7 +131,10 @@ int Client::start()
         printf("Please input the port : \n");
         scanf("%s",send_port);
         printf("Please input the message : \n");
-        scanf("%s",send_message);
+        // scanf("%s",send_message);
+        getchar();//get the '\n'
+        cin.getline(send_message,BUFFER_LENGTH);
+
         strcat(a, send_addr);
         strcat(a, "#");
         strcat(a, send_port);
