@@ -38,17 +38,17 @@ struct ClientSocket
     }
 };
 
-std::vector<ClientSocket> clients_queue;
+FILE *fp = fopen("server.log", "a+");
 const char *server_name = "myserver";
 const char *server_addr = "127.0.0.1";
-FILE *fp = fopen("server.log", "a+");
+int MAX_CONNECTION = 20;
+const char *port = "2776";
+std::vector<ClientSocket> clients_queue;
 
 class Server
 {
 private:
     SOCKET server_socket;
-    int MAX_CONNECTION = 20;
-    const char *port = "2776";
 
 public:
     Server();
@@ -59,13 +59,6 @@ public:
 Server::Server()
 {
     // Read server's information from config.ini
-    INIReader reader("config.ini");
-    if (reader.ParseError() != 0)
-        throw "Load config.ini failed.\n";
-    server_name = reader.Get("server", "server_name", "UNKNOWN").c_str();
-    server_addr = reader.Get("server", "ip", "UNKNOWN").c_str();
-    this->port = reader.Get("server", "port", "UNKNOWN").c_str();
-    this->MAX_CONNECTION = reader.GetInteger("server", "concurrency", -1);
 }
 
 Server::~Server()
@@ -103,7 +96,7 @@ void Server::start()
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(server_addr, this->port, &hints, &result);
+    iResult = getaddrinfo(server_addr, port, &hints, &result);
     if (iResult != 0)
     {
         WSACleanup();
@@ -181,6 +174,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
     char read_buffer[BUFFER_LENGTH];
     char write_buffer[BUFFER_LENGTH];
     int iResult;
+    std::cout << server_name << std::endl;
     // optional
     {
         // send hello
@@ -316,9 +310,16 @@ int main(int argc, char **argv)
 {
     try
     {
+        INIReader reader("config.ini");
+        if (reader.ParseError() != 0)
+            throw "Load config.ini failed.\n";
+        server_name = reader.Get("server", "server_name", "UNKNOWN").c_str();
+        server_addr = reader.Get("server", "ip", "UNKNOWN").c_str();
+        port = reader.Get("server", "port", "UNKNOWN").c_str();
+        MAX_CONNECTION = reader.GetInteger("server", "concurrency", -1);
+
         Server server;
         server.start();
-        Sleep(100000);
     }
     catch (const char *message)
     {
