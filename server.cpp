@@ -22,7 +22,7 @@
 
 #pragma comment(lib, "Ws2_32")
 
-DWORD WINAPI connection(LPVOID ipParameter);
+unsigned __stdcall connection(void *ipParameter);
 sockaddr_in removeClient(SOCKET client_addr);
 
 struct ClientSocket
@@ -42,12 +42,14 @@ struct ClientSocket
 * server's basic infor default as below
 * config server's ip, port, concurrency and name in config.ini
 */
-FILE *fp = fopen("server.log", "a+");
+
 const char *server_name = "myserver";
 const char *server_addr = "127.0.0.1";
 int MAX_CONNECTION = 20;
 const char *port = "2776";
 std::vector<ClientSocket> clients_queue;
+
+HANDLE h_mutex = CreateMutex(NULL, FALSE, NULL);
 
 class Server
 {
@@ -67,6 +69,7 @@ Server::Server()
 Server::~Server()
 {
     closesocket(server_socket);
+    CloseHandle(h_mutex);
     WSACleanup();
     printf("Server has been closed.\n");
 }
@@ -146,6 +149,7 @@ void Server::start()
         int caddr_size = sizeof(client_addr);
         // Accept a client socket
         client_socket = accept(server_socket, (sockaddr *)(&client_addr), &caddr_size);
+
         if (client_socket == INVALID_SOCKET)
         {
             closesocket(server_socket);
@@ -160,7 +164,7 @@ void Server::start()
         // insert client socket in socket message queue
         clients_queue.push_back(ClientSocket(client_socket, client_addr));
         // create a thread for client and listen for its message
-        HANDLE hThread = CreateThread(NULL, 0, connection, &client_socket, 0, NULL);
+        HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, connection, &client_socket, 0, NULL);
         if (hThread == NULL)
         {
             closesocket(server_socket);
@@ -171,7 +175,7 @@ void Server::start()
     }
 }
 
-DWORD WINAPI connection(LPVOID ipParameter)
+unsigned __stdcall connection(LPVOID ipParameter)
 {
     SOCKET socket = *((SOCKET *)ipParameter);
     char read_buffer[BUFFER_LENGTH];
@@ -183,6 +187,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
         const char *greet = "hello! Connection established successfully.\n";
         send(socket, greet, strlen(greet), 0);
     }
+
     // keep on listening client's request
     while (true)
     {
@@ -192,6 +197,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
 
         // receive package from client
         iResult = recv(socket, read_buffer, BUFFER_LENGTH, 0);
+        WaitForSingleObject(h_mutex, INFINITE);
 
         // socket closed by client forcibly
         if (iResult <= 0)
@@ -199,6 +205,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
             sockaddr_in del_addr = removeClient(socket);
             printf("Client %s:%d disconnected.\n", inet_ntoa(del_addr.sin_addr), del_addr.sin_port);
             closesocket(socket);
+            ReleaseMutex(h_mutex);
             break;
         }
         // deal&send package to client
@@ -221,6 +228,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 del_addr = removeClient(socket);
                 printf("Client %s:%d disconnected.\n", inet_ntoa(del_addr.sin_addr), del_addr.sin_port);
                 closesocket(socket);
+                ReleaseMutex(h_mutex);
                 return 0;
             case GET_TIME:
                 // [1 byte type] [time]
@@ -282,13 +290,27 @@ DWORD WINAPI connection(LPVOID ipParameter)
                 printf("failed to parses the request type of the packet.\n");
                 break;
             }
+            
+            // print response package info into server.log
+            FILE *fp = fopen("server.log", "a+");
+            for (auto iter = clients_queue.begin(); iter != clients_queue.end(); ++iter)
+            {
+                if (iter->client_socket == socket)
+                {
+                    src_addr = iter->client_addr;
+                    break;
+                }
+            }
+            fprintf(fp, "%s:%d: ", inet_ntoa(src_addr.sin_addr), src_addr.sin_port);
             fprintf(fp, "%d ", write_buffer[0]);
             for (int i = 1; i < strlen(write_buffer); i++)
             {
-
                 fputc(write_buffer[i], fp);
             }
             fputc('\n', fp);
+            fclose(fp);
+
+            ReleaseMutex(h_mutex);
         }
     }
     return 0;
@@ -308,6 +330,7 @@ sockaddr_in removeClient(SOCKET socket)
     }
     return addr;
 }
+
 int main(int argc, char **argv)
 {
     try
@@ -328,4 +351,4 @@ int main(int argc, char **argv)
     {
         std::cerr << message << std::endl;
     }
-}2
+}
