@@ -24,6 +24,7 @@ DWORD WINAPI connection(LPVOID ipParameter);
 
 class Client{
 public:
+//some information about the client
     SOCKET mysocket;
     char addr[20] = {0};
     int islink = 0;
@@ -47,7 +48,9 @@ Client::Client()
 
 int Client::start()
 {
+    //wait for the receive thread
     while(waiting_for_reply == 1);
+    //the user-interactive
     if(islink == 0){
         printf("Please input your operation\n");
         printf("-------------------------------\n");
@@ -64,7 +67,7 @@ int Client::start()
     printf("Waiting for the server to reply...\n");
     waiting_for_reply = 1;
     char a[BUFFER_LENGTH] = {0};
-    // char* a = (char*)malloc(BUFFER_LENGTH*sizeof(char));
+    //link
     if(current_service == 0&&islink ==0){
         //link 
         WORD sockVersion = MAKEWORD(2,2);
@@ -73,6 +76,7 @@ int Client::start()
             cout<<"WSAStartup fail!"<<endl;
             return 0;
         }
+        //input the ip and the port
         cout<<"Please input the address of the server that you want to connect"<<endl;
         cin>>addr>>port;
         cout<<"Your input address : "<<addr<<endl;
@@ -86,6 +90,7 @@ int Client::start()
             serAddr.sin_port = htons(port);
             serAddr.sin_addr.S_un.S_addr = inet_addr(addr);
             memset(&(serAddr.sin_zero), '\0', 8);
+            //try to connect
             if(connect(mysocket, (struct sockaddr*)&serAddr, sizeof(serAddr)) == SOCKET_ERROR){
                 cout<<"connect error!"<<endl;
                 shutdown(mysocket,SD_BOTH);
@@ -100,28 +105,34 @@ int Client::start()
             return 0;
         }
     }
+    //get the time
     else if(current_service == 1&&islink==1){
         //get time 
         a[0] = GET_TIME;
-        send(mysocket,a,1,0);//strlen((char*)"1") == 1
+        // for(int i=0;i<100;i++){
+            send(mysocket,a,1,0);
+            // sleep(100);
+        // }//this is for the test, get 100 mysocket.       
         cleanbuffer(a);
     }
+    //get the name of the server
     else if(current_service == 2&&islink==1){
         //get server name
         a[0] = GET_SERVER_NAME;
         send(mysocket,a,1,0);
         cleanbuffer(a);
     }
+    //send the third type of the message : get the list of the clients
     else if(current_service == 3&&islink==1){
         //get client list
         a[0] = GET_CLIENT_LIST;
         send(mysocket,a,1,0);
         cleanbuffer(a);
     }
+    //send the forth type of message : send message to another client
     else if(current_service == 4&&islink==1){
         //get client message
-        cleanbuffer(a);
-        // a[0] = '4';
+        cleanbuffer(a);]
         a[0] = GET_CLIENT_MESSAGE;
         char send_addr[10] = {0};
         char send_port[10] = {0};
@@ -144,7 +155,8 @@ int Client::start()
         send(mysocket,a,strlen(a),0);
         cleanbuffer(a);
         waiting_for_reply = 0;
-    }//现在的问题，三的输出多了一个，四的输入第一个byte写不进去。
+    }
+    //exit
     else if(current_service == 5){
         printf("exit the client\n");
         a[0] = 0;
@@ -187,6 +199,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
     char* read_buffer = (char*)malloc(BUFFER_LENGTH*sizeof(char));
     cleanbuffer(read_buffer);
     int iResult;
+    //when you first connect the server, receive a message from the server.
     iResult = recv(socket, read_buffer, BUFFER_LENGTH, 0);
     if (iResult <= 0){
         printf("Connection has been closed\n");
@@ -196,7 +209,9 @@ DWORD WINAPI connection(LPVOID ipParameter)
     cleanbuffer(read_buffer);
     waiting_for_reply = 0;
     while(true){
+        //listen to the server continuously.
         iResult = recv(socket, read_buffer, BUFFER_LENGTH, 0);
+        //whether the connection is closed.
         if (iResult <= 0)
         {
             printf("Connection has been closed\n");
@@ -204,19 +219,24 @@ DWORD WINAPI connection(LPVOID ipParameter)
             break;
         }
         else {
+            //check the type.
             char type = read_buffer[0];
+            //receive the time
             if(type == 1){
                 printf("FROM SERVER : %s\n",read_buffer+1);
             }
+            //receive the name of the server
             else if(type == 2){
                 printf("FROM SERVER : %s\n",read_buffer+1);
             }
+            //receive the list of the clients
             else if(type == 3){
                 int n = 0;
                 printf("FROM SERVER : %s\n",read_buffer);
                 char* cut_read_buffer = cutbuffer(read_buffer);//shorter
                 printf("No.%d, client address : ",n);
                 n++;
+                //parse the packet
                 for(int i = 0; i < strlen(cut_read_buffer); i++){
                     if(cut_read_buffer[i] == '#'){
                         printf(", client port : ");
@@ -236,6 +256,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
                     }
                 }
             }
+            //receive a message from another client
             else if(type == 4){
                 int message_start = -1;
                 char* cut_read_buffer = cutbuffer(read_buffer);
@@ -244,7 +265,7 @@ DWORD WINAPI connection(LPVOID ipParameter)
                     if(cut_read_buffer[i] == '@'){
                         printf("FROM SERVER : ");
                     }
-                    if(cut_read_buffer[i] == '#'){
+                    else if(cut_read_buffer[i] == '#'){
                         printf(", PORT : ");
                     }
                     else if(cut_read_buffer[i] == '$'){
@@ -265,12 +286,14 @@ DWORD WINAPI connection(LPVOID ipParameter)
     return 0;
 }
 
+//this function is used to clean the buffer to all zero.
 void cleanbuffer(char buffer[]){
     for(int i = 0; i < BUFFER_LENGTH; i++){
         buffer[i] = 0;
     }
 }
 
+//this function is used to cut the buffer to a shorter one.
 char* cutbuffer(char* buffer){
     int i = 0;
     for(i=BUFFER_LENGTH-1;i>=0;i--) {
@@ -288,7 +311,7 @@ char* cutbuffer(char* buffer){
 
 
 int main(){
-    Client thisclient;
+    Client thisclient;//let the client begin
     while(thisclient.start() > 0);
     return 0;
 }
